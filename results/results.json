@@ -1,0 +1,122 @@
+{
+  "peak": {
+    "Random": {
+      "avg_queue": 13.84986111111111,
+      "avg_wait_s": 43.18841160199494,
+      "throughput": 1153.55,
+      "switches": 240.35,
+      "avg_queue_sd": 5.710949148900483,
+      "avg_wait_s_sd": 17.81862896242316,
+      "throughput_sd": 33.53874624967368,
+      "switches_sd": 9.551308810838439
+    },
+    "Fixed-Time": {
+      "avg_queue": 5.394236111111111,
+      "avg_wait_s": 16.794045382119,
+      "throughput": 1154.95,
+      "switches": 119.0,
+      "avg_queue_sd": 0.5963403170395675,
+      "avg_wait_s_sd": 1.5608351987684432,
+      "throughput_sd": 34.340173266889614,
+      "switches_sd": 0.0
+    },
+    "Longest-Queue": {
+      "avg_queue": 3.9036111111111103,
+      "avg_wait_s": 12.130423345162225,
+      "throughput": 1157.85,
+      "switches": 280.5,
+      "avg_queue_sd": 0.2697089909788229,
+      "avg_wait_s_sd": 0.6402685041108404,
+      "throughput_sd": 34.498224591998934,
+      "switches_sd": 7.010706098532443
+    },
+    "SARSA": {
+      "avg_queue": 3.19,
+      "avg_wait_s": 9.923344870107488,
+      "throughput": 1157.9,
+      "switches": 228.65,
+      "avg_queue_sd": 0.3436832426760088,
+      "avg_wait_s_sd": 1.1175123626080399,
+      "throughput_sd": 34.57875070039402,
+      "switches_sd": 8.350299395830067
+    },
+    "Q-Learning": {
+      "avg_queue": 3.1083333333333334,
+      "avg_wait_s": 9.66106868685995,
+      "throughput": 1158.3,
+      "switches": 221.15,
+      "avg_queue_sd": 0.12610927556177637,
+      "avg_wait_s_sd": 0.27718189194876386,
+      "throughput_sd": 34.63249918790153,
+      "switches_sd": 6.207052440571128
+    }
+  },
+  "uniform": {
+    "Random": {
+      "avg_queue": 5.387152777777778,
+      "avg_wait_s": 19.32474420021916,
+      "throughput": 1004.6,
+      "switches": 237.6,
+      "avg_queue_sd": 0.8842394543423976,
+      "avg_wait_s_sd": 3.2760829982690387,
+      "throughput_sd": 25.64254277562972,
+      "switches_sd": 6.703730304837748
+    },
+    "Fixed-Time": {
+      "avg_queue": 3.9688194444444433,
+      "avg_wait_s": 14.216915962485535,
+      "throughput": 1004.5,
+      "switches": 119.0,
+      "avg_queue_sd": 0.2400836061133344,
+      "avg_wait_s_sd": 0.6493618537829824,
+      "throughput_sd": 24.992999019725502,
+      "switches_sd": 0.0
+    },
+    "Longest-Queue": {
+      "avg_queue": 2.7116666666666664,
+      "avg_wait_s": 9.680922695455491,
+      "throughput": 1007.4,
+      "switches": 281.3,
+      "avg_queue_sd": 0.1994777131027207,
+      "avg_wait_s_sd": 0.5168502260048878,
+      "throughput_sd": 25.70875337312177,
+      "switches_sd": 6.760917097554148
+    },
+    "SARSA": {
+      "avg_queue": 2.4150694444444443,
+      "avg_wait_s": 8.623191471910413,
+      "throughput": 1007.5,
+      "switches": 245.1,
+      "avg_queue_sd": 0.14967704108541974,
+      "avg_wait_s_sd": 0.3630055546881477,
+      "throughput_sd": 25.295256472311166,
+      "switches_sd": 8.700000000000001
+    },
+    "Q-Learning": {
+      "avg_queue": 2.461875,
+      "avg_wait_s": 8.794760374509556,
+      "throughput": 1007.1,
+      "switches": 233.75,
+      "avg_queue_sd": 0.14905144719873414,
+      "avg_wait_s_sd": 0.3704430524440567,
+      "throughput_sd": 25.46743018052666,
+      "switches_sd": 6.023910689909006
+    }
+  },
+  "hyperparameters": {
+    "alpha": 0.1,
+    "gamma": 0.95,
+    "eps_start": 1.0,
+    "eps_end": 0.02,
+    "eps_decay": 0.97
+  },
+  "episodes": 200,
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "eval_episodes": 20
+}

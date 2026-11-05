@@ -1,0 +1,546 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>Traffic Signal Duel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+/* Layout: a road-engineer's control sheet. The live junctions lead; results and plain explanations follow. */
+:root {
+  --bg: #eef1ef; --panel: #fbfcfb; --fg: #17201c; --muted: #4d5a54; --line: #cfd6d2;
+  --road: #4a5150; --block: #dbe3dc; --mark: #f3f4ef; --car: #f5f6f2; --car-edge: #1c2321;
+  --q: #2a78d6; --base: #eb6834; --neutral: #98a39d;
+  --go: #16894a; --wait: #c98500; --stop: #d0343c;
+  --display: "Barlow Semi Condensed", "Arial Narrow", Arial, sans-serif;
+  --body: "Barlow", "Segoe UI", Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121715; --panel: #1b211f; --fg: #eef2ef; --muted: #aab6b0; --line: #333d39;
+  --road: #39403f; --block: #232b28; --mark: #d9dcd6; --car: #eef0ea; --car-edge: #101412;
+  --q: #3987e5; --base: #d95926; --neutral: #7c8882;
+  --go: #2fb56b; --wait: #e0a21a; --stop: #e8565d; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #121715; --panel: #1b211f; --fg: #eef2ef; --muted: #aab6b0; --line: #333d39;
+  --road: #39403f; --block: #232b28; --mark: #d9dcd6; --car: #eef0ea; --car-edge: #101412;
+  --q: #3987e5; --base: #d95926; --neutral: #7c8882;
+  --go: #2fb56b; --wait: #e0a21a; --stop: #e8565d; color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font: 400 16px/1.5 var(--body); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 56px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 40px; }
+.wrap > * { min-width: 0; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.12; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2.1rem, 5.4vw, 3.5rem); font-weight: 700; max-width: 20ch; }
+h2 { font-size: 1.75rem; font-weight: 700; }
+h3 { font-size: 1.2rem; font-weight: 600; }
+p { margin: 0; max-width: 68ch; }
+.muted { color: var(--muted); }
+.small { font-size: .875rem; }
+.eyebrow { font: 600 .82rem/1.2 var(--display); letter-spacing: .09em; text-transform: uppercase; color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+header { display: grid; gap: 12px; }
+header .lede { font-size: 1.15rem; }
+section { display: grid; gap: 16px; }
+section > * { min-width: 0; }
+.board { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; display: grid; gap: 16px; }
+.board > * { min-width: 0; }
+.bar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: end; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field > label, .field > .lab { font-size: .8rem; font-weight: 600; color: var(--muted); }
+button, select { font: 500 .95rem var(--body); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 7px 12px; min-height: 38px; cursor: pointer; max-width: 100%; }
+button:hover, select:hover { border-color: var(--muted); }
+:focus-visible { outline: 2px solid var(--q); outline-offset: 2px; }
+#play { background: var(--fg); color: var(--panel); border-color: var(--fg); font-weight: 600; min-width: 92px; }
+.seg { display: inline-flex; flex-wrap: wrap; }
+.seg button { border-radius: 0; margin-left: -1px; }
+.seg button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.seg button:last-child { border-radius: 0 4px 4px 0; }
+.seg button[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); position: relative; }
+.clock { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; align-items: center; }
+#scrub { width: 100%; accent-color: var(--fg); margin: 0; }
+#clock { font: 600 1.15rem var(--display); }
+#rush { grid-column: 1 / -1; }
+.duel { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.junction { display: grid; gap: 10px; min-width: 0; align-content: start; }
+.jhead { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 10px; min-height: 34px; }
+.key { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+.pill { display: inline-flex; align-items: center; gap: 7px; font-size: .84rem; font-weight: 600; padding: 3px 9px; border: 1px solid var(--line); border-radius: 4px; }
+.lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--go); }
+canvas { display: block; width: 100%; max-width: 100%; aspect-ratio: 1 / 1; border-radius: 4px; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.stats div { min-width: 0; }
+.stats dt { font-size: .76rem; line-height: 1.25; color: var(--muted); }
+.stats dd { margin: 2px 0 0; font: 600 1.45rem/1.1 var(--display); font-variant-numeric: tabular-nums; }
+#verdict { font: 600 1.15rem/1.3 var(--display); padding-top: 12px; border-top: 1px solid var(--line); max-width: none; }
+.brain { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 24px; padding-top: 14px; border-top: 1px solid var(--line); }
+.brain > * { min-width: 0; }
+.score { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 4px; }
+.score + .score { margin-top: 6px; }
+.score.on { border-color: var(--q); box-shadow: inset 0 0 0 1px var(--q); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: .875rem; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; height: 240px; overflow: visible; touch-action: pan-y; }
+.chart text { fill: var(--muted); font: 12px var(--body); }
+.tip { position: absolute; pointer-events: none; z-index: 5; background: var(--fg); color: var(--panel); font-size: .8rem; line-height: 1.35; padding: 6px 9px; border-radius: 4px; white-space: nowrap; }
+.resultbars { display: grid; gap: 7px; }
+.rb { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 10px; align-items: center; padding: 2px 0; }
+.rb .name { font-size: .92rem; }
+.rb .track { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.rb .fill { height: 20px; background: var(--neutral); border-radius: 0 4px 4px 0; flex: none; }
+.rb.best .fill { background: var(--q); }
+.rb.best .name { font-weight: 600; }
+.rb .v { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tablewrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; min-width: 520px; }
+th, td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; font-size: .92rem; }
+th { font-weight: 600; color: var(--muted); font-size: .8rem; vertical-align: bottom; }
+th:first-child, td:first-child { text-align: left; }
+tr.hl td { font-weight: 600; }
+.explain { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px 40px; }
+.explain > div { display: grid; gap: 8px; align-content: start; min-width: 0; }
+.explain ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; }
+footer { font-size: .85rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; }
+@media (max-width: 760px) {
+  .duel, .brain, .explain { grid-template-columns: minmax(0, 1fr); }
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  canvas { max-width: 440px; margin-inline: auto; }
+  .rb { grid-template-columns: 92px minmax(0, 1fr); }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Adaptive traffic signal control · Q-Learning</div>
+    <h1>The trained signal cuts waiting time by 42%</h1>
+    <p class="lede">Over 20 busy test hours, a car waited <strong>9.7 s</strong> on average with the Q-Learning signal and <strong>16.8 s</strong> with a normal fixed-time signal. Watch the two handle identical traffic below.</p>
+  </header>
+
+  <section aria-labelledby="live-h">
+    <h2 id="live-h">Live demo</h2>
+    <div class="board">
+      <div class="bar">
+        <button id="play" type="button">Pause</button>
+        <button id="restart" type="button">Restart hour</button>
+        <div class="field"><span class="lab">Speed</span>
+          <div class="seg" role="group" aria-label="Speed">
+            <button type="button" data-speed="2500">Very slow</button><button type="button" data-speed="1400">Slow</button><button type="button" data-speed="700">Normal</button><button type="button" data-speed="150">Fast</button><button type="button" data-speed="8">Very fast</button>
+          </div>
+        </div>
+        <div class="field"><label for="other">Compare the agent with</label>
+          <select id="other"><option value="fixed">Fixed-Time</option><option value="lq">Longest-Queue</option><option value="random">Random</option></select>
+        </div>
+        <div class="field"><label for="traffic">Traffic</label>
+          <select id="traffic"></select>
+        </div>
+        <button id="newtraffic" type="button">New random hour</button>
+      </div>
+      <div class="clock">
+        <span id="clock" class="num">00:00</span>
+        <input id="scrub" type="range" min="0" max="720" value="0" aria-label="Time within the simulated hour">
+        <span id="rush" class="small muted"></span>
+      </div>
+      <div class="duel">
+        <div class="junction" id="J0"></div>
+        <div class="junction" id="J1"></div>
+      </div>
+      <p id="verdict"></p>
+      <div class="brain">
+        <div>
+          <h3>What the agent sees and decides</h3>
+          <p id="sees" class="small" style="margin-top:6px"></p>
+          <p id="blocked" class="small muted" style="margin-top:6px"></p>
+        </div>
+        <div>
+          <div class="score" id="sKeep"><span>Keep the current green</span><span class="num" id="vKeep"></span></div>
+          <div class="score" id="sSwitch"><span>Switch to the other road</span><span class="num" id="vSwitch"></span></div>
+          <p class="small muted" style="margin-top:6px">Each score is the agent's learned estimate of future congestion. Closer to zero is better, and it takes the better one.</p>
+        </div>
+      </div>
+      <div style="display:grid;gap:8px;padding-top:14px;border-top:1px solid var(--line)">
+        <h3>Cars waiting over the hour</h3>
+        <div class="legend" id="legend"></div>
+        <div class="chart" id="qchart"><svg id="qsvg" role="img" aria-label="Number of cars waiting over time for both signals"></svg><div class="tip" id="qtip" hidden></div></div>
+        <p class="small muted">Rolling average over 75 seconds. Lower is better. Hover or drag for exact values.</p>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="res-h">
+    <h2 id="res-h">Full results</h2>
+    <div class="board">
+      <div class="bar">
+        <div class="seg" role="group" aria-label="Traffic pattern">
+          <button type="button" data-scn="peak" aria-pressed="true">Busy hours with rush peaks</button><button type="button" data-scn="uniform" aria-pressed="false">Steady traffic</button>
+        </div>
+      </div>
+      <h3 id="resTitle">Average wait per car, in seconds (lower is better)</h3>
+      <div class="resultbars" id="rbars"></div>
+      <p id="resNote"></p>
+      <div class="tablewrap"><table>
+        <thead><tr><th scope="col">Signal</th><th scope="col">Average wait (s)</th><th scope="col">Hour-to-hour spread (± s)</th><th scope="col">Cars waiting, average</th><th scope="col">Cars served per hour</th><th scope="col">Signal changes per hour</th></tr></thead>
+        <tbody id="rtable"></tbody>
+      </table></div>
+      <p class="small muted">Average of 20 simulated hours the agents never trained on, from <span class="num">results/results.json</span>.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="exp-h">
+    <h2 id="exp-h">How to read this</h2>
+    <div class="explain">
+      <div>
+        <h3>What each number means</h3>
+        <ul>
+          <li><strong>Average wait:</strong> how long a typical car sits in the queue. This is the main result.</li>
+          <li><strong>Cars waiting:</strong> how many cars are queued at any moment, across all four roads.</li>
+          <li><strong>Cars served:</strong> how many got through. It is nearly equal for every sensible signal because the road has spare capacity, so the difference is how soon cars get through.</li>
+          <li><strong>Signal changes:</strong> how often the light switches. Each change loses 5 s to yellow, so changing too often wastes time. That is why Longest-Queue loses to the agent.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Why you see 42%, 38% and 36%</h3>
+        <ul>
+          <li><strong>42%</strong> is the project result: 16.8 s to 9.7 s, averaged over the 20 test hours.</li>
+          <li><strong>38%</strong> comes from a wider check of 200 other hours with the same saved agent: 16.3 s to 10.1 s.</li>
+          <li><strong>36%</strong> is one single hour, the one <span class="num">demo.py</span> prints and this page opens with: 15.0 s to 9.6 s.</li>
+        </ul>
+        <p>Each hour has different traffic, so the percentage moves. The agent wins clearly in all three.</p>
+      </div>
+      <div>
+        <h3>How the agent learned</h3>
+        <ul>
+          <li><strong>What it sees:</strong> how busy each road is, which road has green, and how long it has been green. That makes 288 possible situations.</li>
+          <li><strong>What it can do:</strong> keep the green or switch. A green must last at least 10 s.</li>
+          <li><strong>How it is scored:</strong> a penalty for every car waiting, at every 5 s step.</li>
+          <li><strong>Practice:</strong> 200 simulated hours of trial and error, ending in a table of scores for each situation. That table drives the live demo above.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Limits of this result</h3>
+        <ul>
+          <li>This is a simulation of one junction with made-up demand. It has not been tested on real traffic.</li>
+          <li>The agent is usually steady but sometimes has a bad hour. Across 1,000 simulated hours the typical wait was 9.7 s, while the worst single hour reached 43.7 s.</li>
+          <li>Q-Learning and SARSA are effectively tied. In steady traffic SARSA is slightly ahead.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <footer>The demo runs the project's saved Q-table in the browser using a JavaScript copy of <span class="num">traffic_env.py</span> and <span class="num">agents.py</span>. On the three recorded hours it matches the Python wait, queue, served and switch figures exactly. "New random hour" uses a browser random generator, so those hours have no Python equivalent.</footer>
+</div>
+
+<script>/* Browser port of traffic_env.py and the controllers in agents.py. */
+const Sim = (() => {
+  const LEN = 720, SAT = 2, MAXQ = 40, MIN_GREEN = 2;
+  const QB = [0, 1, 3, 5, 8, 13], TB = [0, 2, 4, 8];
+  const bin = (x, b) => { let i = 0; while (i + 1 < b.length && x >= b[i + 1]) i++; return i; };
+  const rng32 = (seed) => () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  function rates(t) {
+    const f = t / LEN;
+    const ns = 1 + 0.6 * Math.exp(-((f - 0.4) ** 2) / 0.02);
+    const ew = 1 + 1.0 * Math.exp(-((f - 0.8) ** 2) / 0.01);
+    return [0.45 * ns, 0.45 * ns, 0.25 * ew, 0.25 * ew].map((r) => Math.min(r, 0.95));
+  }
+  function poisson(lam, rnd) {
+    const L = Math.exp(-lam); let k = 0, p = 1;
+    do { k++; p *= rnd(); } while (p > L);
+    return k - 1;
+  }
+  function makeArrivals(seed) {
+    const rnd = rng32(seed), out = [];
+    for (let t = 0; t < LEN; t++) out.push(rates(t).map((r) => poisson(r, rnd)));
+    return out;
+  }
+  function encode(q, phase, tip) {
+    const qn = bin(q[0] + q[1], QB), qe = bin(q[2] + q[3], QB);
+    return ((qn * 6 + qe) * 2 + phase) * 4 + bin(tip, TB);
+  }
+  function controller(name, Q) {
+    if (name === 'q') {
+      const rnd = rng32(0);
+      return (st) => { const v = Q[encode(st.q, st.phase, st.tip)]; return v[0] === v[1] ? (rnd() < 0.5 ? 0 : 1) : (v[1] > v[0] ? 1 : 0); };
+    }
+    if (name === 'fixed') return (st) => (st.tip >= 6 ? 1 : 0);
+    if (name === 'lq') return (st) => ((st.q[0] + st.q[1] >= st.q[2] + st.q[3] ? 0 : 1) !== st.phase ? 1 : 0);
+    const rnd = rng32(12345);
+    return () => (rnd() < 0.5 ? 0 : 1);
+  }
+  /* Runs a whole hour and returns one frame per 5 s step; frames[0] is the empty start. */
+  function run(name, arrivals, Q) {
+    const act = controller(name, Q);
+    const st = { q: [0, 0, 0, 0], phase: 0, tip: 0 };
+    let yellow = 0, served = 0, integral = 0, switches = 0;
+    const frames = [{ t: 0, q: [0, 0, 0, 0], phase: 0, tip: 0, yellow: false, action: 0, arr: [0, 0, 0, 0], out: [0, 0, 0, 0], served: 0, integral: 0, switches: 0, state: 0, switched: false }];
+    for (let t = 0; t < LEN; t++) {
+      const state = encode(st.q, st.phase, st.tip);
+      const action = act(st);
+      let switched = false;
+      if (action === 1 && st.tip >= MIN_GREEN && yellow === 0) {
+        st.phase = 1 - st.phase; st.tip = 0; yellow = 1; switches++; switched = true;
+      }
+      const a = arrivals[t];
+      st.q = st.q.map((x, i) => Math.min(x + a[i], MAXQ));
+      const out = [0, 0, 0, 0], wasYellow = yellow > 0;
+      if (wasYellow) yellow--;
+      else for (const lane of st.phase === 0 ? [0, 1] : [2, 3]) {
+        out[lane] = Math.min(st.q[lane], SAT); st.q[lane] -= out[lane]; served += out[lane];
+      }
+      st.tip++;
+      integral += st.q[0] + st.q[1] + st.q[2] + st.q[3];
+      frames.push({ t: t + 1, q: st.q.slice(), phase: st.phase, tip: st.tip, yellow: wasYellow, action, arr: a, out, served, integral, switches, state, switched });
+    }
+    return frames;
+  }
+  const metrics = (f) => ({
+    avg_queue: f.integral / Math.max(f.t, 1),
+    avg_wait_s: (f.integral * 5) / Math.max(f.served, 1),
+    throughput: f.served, switches: f.switches,
+  });
+  return { LEN, MIN_GREEN, QB, makeArrivals, run, metrics, encode };
+})();
+if (typeof module !== 'undefined') module.exports = Sim;
+</script>
+<script>
+const DATA = {"Q":[[-5.406702,-5.419315],[-5.263658,-5.491989],[-5.527667,-5.57773],[-5.323267,-5.50229],[-5.19884,-5.194354],[-5.445194,-5.62818],[-5.094545,-5.40561],[-0.293601,-0.554472],[-5.754062,-5.818949],[-6.09018,-5.783433],[-6.116409,-5.693515],[-5.953135,-5.68521],[-5.429531,-5.725486],[-5.418234,-5.667039],[-1.744023,-1.517333],[0.0,0.0],[-5.352841,-5.424721],[-6.596958,-6.438869],[-6.537812,-6.406603],[-6.686217,-6.282665],[-5.668819,-5.885964],[-5.785614,-5.874371],[-0.547097,-0.132686],[0.0,0.0],[-4.890589,-5.028416],[-7.021063,-6.789271],[-7.039634,-6.710509],[-6.925243,-6.889923],[-5.986576,-6.200601],[-5.521457,-5.695297],[0.0,0.0],[0.0,0.0],[-1.755676,-1.945397],[-6.827139,-6.765149],[-7.142286,-6.711469],[-6.570834,-6.520021],[-6.201884,-6.266512],[-3.384196,-3.690765],[-0.089327,0.0],[0.0,0.0],[-0.469827,-0.375517],[-4.910829,-5.000755],[-4.734865,-4.855905],[-4.20172,-4.033226],[-3.945615,-3.909451],[-0.984402,-0.750669],[0.0,0.0],[0.0,0.0],[-5.547216,-5.17344],[-5.2662,-5.657399],[-5.484218,-5.542623],[-2.989695,-3.041082],[-5.809796,-5.781824],[-5.954676,-4.970437],[-5.638156,-5.923267],[-3.39604,-3.228426],[-5.805456,-6.015192],[-5.802837,-6.271134],[-5.880749,-6.137138],[-5.118895,-5.152095],[-5.747928,-6.196256],[-5.90989,-6.222512],[-5.702033,-5.956352],[-0.143387,0.0],[-6.519989,-6.445878],[-6.691069,-6.857469],[-6.577622,-6.783224],[-5.669113,-5.681675],[-6.369024,-6.238966],[-6.076496,-6.551831],[-3.918101,-3.859135],[0.0,0.0],[-6.54447,-6.459339],[-7.137444,-7.223499],[-7.068086,-7.218185],[-5.075537,-5.104804],[-6.424754,-6.639779],[-6.493431,-6.663269],[-2.255064,-2.118305],[0.0,0.0],[-6.081325,-6.164732],[-7.140433,-7.14442],[-6.00317,-6.044197],[-2.851821,-2.593741],[-6.872804,-6.785769],[-5.628418,-5.816361],[-0.455251,-1.069555],[0.0,0.0],[-1.713932,-1.952067],[-4.711061,-4.612038],[-1.194909,-1.204649],[-0.380597,-0.654938],[-5.022247,-4.974263],[-3.340007,-3.086715],[-0.138491,-0.218971],[0.0,0.0],[-5.797887,-5.611725],[-5.427131,-6.315772],[-5.215068,-5.209058],[0.0,0.0],[-6.034744,-5.957927],[-6.494412,-6.265756],[-6.525932,-6.011822],[-5.195294,-5.115923],[-6.055846,-6.240809],[-6.080824,-6.92311],[-6.238819,-6.28692],[-0.5983,-1.152563],[-6.578559,-6.392626],[-6.506177,-6.78258],[-6.640894,-6.807489],[-0.482638,-1.11734],[-6.98419,-6.982075],[-6.891157,-7.174877],[-6.768462,-7.0101],[-0.986218,-1.152409],[-6.769253,-7.001447],[-6.938274,-7.116495],[-5.749189,-5.911557],[0.0,0.0],[-7.019975,-6.963886],[-7.157626,-7.482751],[-6.923499,-6.940195],[-1.278873,-1.060342],[-7.403251,-7.216143],[-6.876596,-6.94934],[-1.657161,-1.69108],[0.0,0.0],[-6.155871,-6.262875],[-5.815161,-5.677673],[-2.950776,-2.818792],[-0.153561,0.0],[-6.569333,-6.502945],[-5.416465,-5.353626],[-1.02726,-1.405042],[0.0,0.0],[-3.589365,-3.688841],[-2.390808,-2.466132],[-0.294,-0.521168],[-0.16,0.0],[-2.804016,-3.010592],[-2.70342,-2.81953],[-0.36,-0.674492],[0.0,0.0],[-6.032211,-5.529076],[-5.906522,-6.038385],[-3.250928,-3.422269],[0.0,0.0],[-6.357117,-6.425664],[-6.943993,-6.620889],[-6.993695,-6.678954],[-6.142416,-6.03166],[-6.594664,-6.366672],[-6.388474,-6.882447],[-6.394881,-6.610602],[-0.298429,-0.469317],[-7.062663,-7.11151],[-7.15185,-7.40907],[-7.179746,-7.153054],[-0.784173,-0.484985],[-7.311948,-7.227292],[-7.220211,-7.236165],[-6.589579,-6.716844],[-0.220389,-0.884393],[-7.350763,-7.273851],[-7.462554,-7.639198],[-4.054148,-4.651672],[0.0,-0.7028],[-7.209068,-7.253],[-7.080297,-7.018381],[-4.568085,-4.382702],[-0.1,-0.823159],[-7.505973,-7.588919],[-6.733314,-6.689798],[-2.960169,-3.068196],[0.0,0.0],[-5.385464,-5.363328],[-3.911105,-3.925165],[-1.062511,-1.422612],[0.0,0.0],[-4.992828,-4.896391],[-3.971845,-3.756525],[-1.502741,-1.614639],[0.0,0.0],[-2.269177,-1.9029],[-0.907066,-0.782802],[0.0,0.0],[0.0,0.0],[-1.742168,-1.672459],[-1.767854,-1.640119],[-0.431334,0.0],[0.0,0.0],[-6.667323,-6.618174],[-6.109578,-6.304532],[-1.885876,-1.63568],[0.0,0.0],[-6.324045,-6.191513],[-7.593198,-7.352233],[-7.466336,-7.348694],[-6.800293,-6.872081],[-7.305053,-7.250846],[-7.063338,-7.142198],[-4.711529,-4.88556],[0.0,0.0],[-7.155553,-7.074731],[-7.840012,-7.826712],[-5.923907,-6.024933],[-0.692722,-0.461493],[-7.024865,-7.041155],[-7.082506,-7.149648],[-3.023272,-3.179994],[-0.420263,-0.908868],[-7.4709,-7.400478],[-5.989793,-5.944569],[-2.360763,-2.888472],[-0.218,-0.385667],[-5.091599,-4.992029],[-4.441445,-4.517405],[-1.79386,-1.532538],[-0.1,0.0],[-5.97586,-6.043179],[-4.62303,-4.281216],[-1.192559,-1.334772],[0.0,0.0],[-2.549553,-2.522858],[-1.279662,-1.307102],[-1.137172,-1.046033],[0.0,0.0],[-2.60914,-2.440155],[-1.912298,-1.932202],[-0.177003,-0.229748],[0.0,0.0],[-0.244801,-0.18],[0.0,0.0],[0.0,0.0],[0.0,0.0],[-0.21858,0.0],[0.0,-0.22],[0.0,0.0],[0.0,0.0],[-6.404235,-6.424968],[-5.593484,-5.453621],[-0.703365,-0.354851],[0.0,0.0],[-4.87778,-5.06198],[-7.068838,-6.995735],[-6.538369,-6.532162],[-4.62696,-4.798442],[-6.881804,-6.837342],[-5.857588,-7.097663],[-3.488396,-3.56953],[0.0,0.0],[-6.903071,-6.78391],[-6.692903,-6.534737],[-1.323422,-1.25648],[-0.439919,0.0],[-3.511405,-3.315901],[-4.000418,-4.159489],[-2.297468,-3.04715],[0.0,0.0],[-6.223738,-6.054901],[-3.120991,-2.561617],[0.0,-0.383599],[0.0,0.0],[-1.418426,-1.649456],[-2.028091,-2.270478],[0.0,-2.008681],[0.0,0.0],[-2.7443,-3.788423],[-0.678035,-0.656321],[0.0,0.0],[0.0,0.0],[-0.18805,0.0],[-0.241282,-0.28091],[0.0,0.0],[0.0,0.0],[-0.24,-0.658493],[-0.260106,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0],[0.0,0.0]],"results":{"peak":{"Random":{"avg_queue":13.84986111111111,"avg_wait_s":43.18841160199494,"throughput":1153.55,"switches":240.35,"avg_queue_sd":5.710949148900483,"avg_wait_s_sd":17.81862896242316,"throughput_sd":33.53874624967368,"switches_sd":9.551308810838439},"Fixed-Time":{"avg_queue":5.394236111111111,"avg_wait_s":16.794045382119,"throughput":1154.95,"switches":119.0,"avg_queue_sd":0.5963403170395675,"avg_wait_s_sd":1.5608351987684432,"throughput_sd":34.340173266889614,"switches_sd":0.0},"Longest-Queue":{"avg_queue":3.9036111111111103,"avg_wait_s":12.130423345162225,"throughput":1157.85,"switches":280.5,"avg_queue_sd":0.2697089909788229,"avg_wait_s_sd":0.6402685041108404,"throughput_sd":34.498224591998934,"switches_sd":7.010706098532443},"SARSA":{"avg_queue":3.19,"avg_wait_s":9.923344870107488,"throughput":1157.9,"switches":228.65,"avg_queue_sd":0.3436832426760088,"avg_wait_s_sd":1.1175123626080399,"throughput_sd":34.57875070039402,"switches_sd":8.350299395830067},"Q-Learning":{"avg_queue":3.1083333333333334,"avg_wait_s":9.66106868685995,"throughput":1158.3,"switches":221.15,"avg_queue_sd":0.12610927556177637,"avg_wait_s_sd":0.27718189194876386,"throughput_sd":34.63249918790153,"switches_sd":6.207052440571128}},"uniform":{"Random":{"avg_queue":5.387152777777778,"avg_wait_s":19.32474420021916,"throughput":1004.6,"switches":237.6,"avg_queue_sd":0.8842394543423976,"avg_wait_s_sd":3.2760829982690387,"throughput_sd":25.64254277562972,"switches_sd":6.703730304837748},"Fixed-Time":{"avg_queue":3.9688194444444433,"avg_wait_s":14.216915962485535,"throughput":1004.5,"switches":119.0,"avg_queue_sd":0.2400836061133344,"avg_wait_s_sd":0.6493618537829824,"throughput_sd":24.992999019725502,"switches_sd":0.0},"Longest-Queue":{"avg_queue":2.7116666666666664,"avg_wait_s":9.680922695455491,"throughput":1007.4,"switches":281.3,"avg_queue_sd":0.1994777131027207,"avg_wait_s_sd":0.5168502260048878,"throughput_sd":25.70875337312177,"switches_sd":6.760917097554148},"SARSA":{"avg_queue":2.4150694444444443,"avg_wait_s":8.623191471910413,"throughput":1007.5,"switches":245.1,"avg_queue_sd":0.14967704108541974,"avg_wait_s_sd":0.3630055546881477,"throughput_sd":25.295256472311166,"switches_sd":8.700000000000001},"Q-Learning":{"avg_queue":2.461875,"avg_wait_s":8.794760374509556,"throughput":1007.1,"switches":233.75,"avg_queue_sd":0.14905144719873414,"avg_wait_s_sd":0.3704430524440567,"throughput_sd":25.46743018052666,"switches_sd":6.023910689909006}}},"refs":[{"seed":2026,"arrivals":[[0,1,0,0],[2,1,2,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[2,0,1,0],[1,1,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,1,0],[0,0,2,0],[1,0,0,0],[2,0,1,0],[0,1,0,0],[0,0,0,0],[2,2,0,0],[1,0,1,0],[0,1,0,1],[0,1,0,0],[0,0,0,0],[0,0,0,1],[0,0,0,0],[1,0,1,0],[1,1,1,0],[0,0,0,0],[1,0,0,0],[0,1,0,0],[1,1,0,0],[0,0,0,1],[0,1,0,0],[0,0,0,2],[1,1,0,0],[2,0,0,0],[1,0,0,0],[0,1,1,0],[0,1,0,0],[1,0,0,2],[0,0,0,0],[0,0,1,0],[0,0,0,0],[0,0,0,1],[1,0,1,0],[0,0,0,0],[0,3,0,0],[0,0,0,0],[1,0,1,0],[0,2,1,0],[1,0,0,0],[1,0,2,0],[0,0,0,0],[0,1,0,0],[2,1,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,1,1],[0,0,0,0],[0,2,0,0],[1,0,1,0],[1,1,0,1],[4,1,0,0],[0,0,1,0],[0,0,0,0],[0,0,0,0],[1,1,1,1],[1,0,0,1],[1,1,0,0],[0,0,0,0],[0,0,0,1],[0,1,0,0],[1,0,1,0],[0,0,0,0],[0,1,0,0],[1,2,0,0],[1,0,0,0],[0,0,1,0],[0,0,2,0],[0,1,0,1],[0,0,0,0],[1,0,0,0],[0,0,0,1],[0,1,0,1],[0,0,1,1],[0,0,0,0],[0,0,0,0],[0,1,1,1],[1,0,0,0],[0,1,0,1],[0,0,0,0],[2,0,0,0],[1,1,0,0],[0,0,0,1],[0,1,0,1],[0,0,0,0],[2,0,0,2],[2,0,1,0],[0,0,0,0],[0,2,0,0],[0,0,0,1],[0,0,1,1],[0,0,0,1],[0,1,0,1],[1,2,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,1],[0,0,0,1],[0,0,0,0],[1,0,0,0],[0,1,1,0],[1,0,1,1],[0,1,0,0],[2,1,0,0],[1,0,0,1],[3,0,0,1],[0,0,0,0],[1,1,1,0],[0,1,3,0],[1,0,1,0],[2,3,0,0],[0,0,0,0],[0,0,0,0],[0,2,0,1],[0,1,0,1],[0,1,0,0],[1,0,0,0],[0,0,0,0],[1,1,0,1],[1,1,2,1],[1,0,0,0],[1,0,0,0],[2,1,0,0],[1,1,0,1],[0,1,0,0],[2,3,0,1],[0,1,0,1],[0,0,0,0],[1,2,0,1],[0,3,0,0],[0,0,0,1],[0,1,0,0],[1,0,0,0],[2,1,2,0],[0,2,1,0],[0,1,0,0],[1,0,1,0],[0,0,0,1],[1,0,0,0],[0,2,0,1],[0,1,0,0],[0,2,0,0],[1,0,0,0],[1,0,0,1],[1,0,0,0],[1,0,0,0],[2,0,0,0],[1,0,0,0],[2,2,0,0],[1,0,0,1],[1,1,0,1],[0,0,0,1],[1,0,2,0],[0,0,0,0],[0,1,1,0],[0,1,0,0],[2,0,0,0],[0,1,0,0],[0,0,0,0],[2,0,0,0],[0,0,1,0],[0,1,0,1],[0,0,0,1],[0,2,0,0],[0,1,2,0],[2,0,0,1],[0,0,1,0],[0,1,1,1],[1,0,1,0],[1,2,1,0],[0,0,0,0],[2,1,0,1],[0,0,0,0],[1,0,0,1],[0,0,2,0],[1,0,0,0],[1,0,1,0],[1,1,0,0],[1,1,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[0,1,1,0],[1,2,0,0],[1,2,0,0],[0,0,0,0],[1,0,1,0],[0,0,1,0],[2,2,0,0],[0,0,0,2],[1,0,0,0],[1,1,1,0],[0,1,0,0],[0,0,0,0],[1,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[2,0,0,0],[1,0,1,0],[0,0,0,0],[2,1,0,0],[3,0,0,0],[0,0,1,0],[2,0,0,0],[0,1,0,1],[1,0,0,0],[0,1,1,0],[2,0,0,0],[1,2,1,0],[0,1,0,0],[0,0,0,1],[1,1,0,0],[2,0,0,0],[2,0,1,0],[0,1,0,0],[0,0,0,0],[0,1,3,3],[0,1,2,0],[2,3,1,0],[1,0,1,0],[3,0,0,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,1,0,1],[1,0,1,1],[0,1,1,0],[1,2,0,0],[0,2,0,1],[2,0,0,0],[0,2,0,0],[2,1,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,0,1],[4,0,1,0],[0,0,0,0],[0,0,0,0],[0,2,1,1],[0,1,0,0],[1,1,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0],[3,0,0,1],[0,0,0,1],[0,1,1,0],[0,0,0,0],[1,1,1,0],[1,1,0,2],[0,0,0,0],[0,0,0,0],[2,1,0,2],[2,1,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[0,2,0,0],[0,1,0,0],[1,3,0,0],[0,1,0,0],[2,1,0,0],[1,0,1,0],[0,1,0,1],[0,3,0,1],[0,1,0,1],[0,3,0,0],[0,0,0,1],[0,1,0,0],[0,0,1,0],[0,1,1,1],[0,0,1,0],[1,1,0,0],[0,0,0,0],[0,2,1,0],[1,0,1,1],[0,1,1,0],[0,0,0,0],[1,2,0,0],[0,0,0,1],[1,2,0,0],[0,2,0,0],[0,3,0,0],[1,0,0,0],[0,0,0,0],[1,0,0,0],[3,0,1,0],[1,0,1,1],[0,1,0,0],[0,2,0,1],[0,0,1,0],[0,0,0,0],[2,0,0,0],[0,0,0,1],[1,0,0,0],[0,4,0,1],[0,2,0,0],[1,0,1,1],[0,1,1,0],[1,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,2,0,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[3,0,0,1],[0,1,0,0],[1,1,0,0],[0,0,0,0],[0,0,1,0],[1,2,0,0],[2,1,0,0],[0,1,0,0],[0,2,1,0],[0,0,1,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,1],[0,2,0,0],[0,1,0,1],[0,0,0,0],[0,0,0,0],[1,0,0,3],[1,1,0,2],[1,0,0,0],[0,1,0,0],[1,0,1,1],[3,1,1,0],[0,0,0,0],[0,1,1,0],[1,1,0,1],[0,1,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[0,0,1,0],[2,0,1,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[0,1,0,0],[0,1,0,0],[0,0,1,0],[1,0,0,0],[1,1,0,1],[1,1,1,0],[0,0,1,0],[2,1,0,0],[0,3,1,0],[0,0,0,0],[0,1,1,0],[2,1,0,0],[0,0,2,1],[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,2,0,0],[0,0,0,0],[0,2,0,0],[2,0,1,0],[2,1,0,1],[1,0,1,0],[0,0,0,0],[2,0,0,0],[1,0,2,0],[0,1,0,1],[0,0,0,0],[3,2,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,2,0,1],[1,2,0,1],[0,3,0,1],[1,1,0,1],[0,1,0,0],[2,0,0,1],[1,0,0,0],[0,0,0,0],[0,0,2,0],[0,1,0,0],[0,0,0,0],[1,0,1,1],[2,0,0,0],[0,1,0,1],[1,0,0,0],[0,0,0,0],[3,0,0,0],[1,0,1,0],[1,0,0,0],[2,0,0,0],[2,0,1,1],[0,1,1,1],[1,0,0,1],[0,1,1,0],[0,2,0,0],[0,0,1,0],[0,1,0,0],[0,1,0,0],[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[0,0,0,0],[1,1,2,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[1,0,1,1],[1,1,0,0],[0,0,0,0],[0,0,0,0],[2,0,0,0],[1,1,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[1,2,0,1],[1,0,0,0],[0,0,0,0],[1,0,1,0],[1,1,0,0],[0,0,0,2],[0,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,1,0],[0,0,1,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,1],[0,0,0,1],[0,2,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,1],[0,0,1,0],[0,1,1,1],[0,0,0,0],[2,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1],[3,0,0,0],[0,1,0,1],[0,0,0,0],[0,1,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,2],[0,0,0,0],[0,0,0,1],[1,0,1,0],[0,0,2,0],[0,1,1,0],[2,1,0,1],[0,0,0,0],[1,0,0,1],[0,1,0,0],[0,0,0,0],[2,0,1,0],[0,0,1,0],[0,1,1,0],[1,1,0,0],[0,1,0,0],[0,0,0,2],[0,0,0,0],[2,0,0,0],[0,0,0,0],[0,1,1,0],[0,2,1,0],[0,0,0,0],[0,0,0,0],[1,0,0,1],[0,1,2,0],[0,0,2,0],[0,1,0,1],[1,1,0,0],[1,0,1,0],[0,0,2,0],[0,0,1,0],[2,0,0,1],[1,0,2,0],[1,1,0,0],[0,0,0,2],[0,1,1,0],[0,0,2,0],[0,2,1,0],[1,0,0,0],[1,0,1,0],[1,0,0,0],[0,0,1,0],[0,0,1,1],[1,1,0,0],[0,0,0,1],[0,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,1,1],[2,2,0,2],[0,1,3,0],[0,0,0,0],[0,0,1,1],[0,0,1,2],[1,0,1,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,1],[0,0,1,0],[0,0,0,0],[0,0,0,0],[2,1,0,0],[0,0,1,2],[0,0,2,0],[1,0,1,0],[1,0,1,1],[0,0,0,0],[0,0,1,0],[0,1,0,1],[2,1,2,0],[0,1,0,0],[1,0,0,0],[0,1,0,1],[0,1,0,0],[0,0,0,0],[0,3,3,0],[2,1,1,0],[1,1,1,0],[0,0,2,0],[0,1,1,1],[0,0,0,1],[0,1,1,2],[2,0,1,0],[0,0,0,0],[0,1,0,1],[0,0,0,0],[0,0,0,2],[0,0,0,0],[0,1,0,1],[1,0,0,1],[0,0,0,1],[0,2,1,1],[0,0,2,0],[2,0,0,0],[0,0,0,0],[0,0,0,1],[0,1,0,2],[1,2,0,0],[0,0,0,0],[0,1,0,0],[0,1,0,0],[1,0,0,0],[1,0,0,1],[1,0,2,1],[0,0,0,0],[2,0,0,2],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,2,1],[0,0,0,0],[2,1,1,0],[0,0,0,1],[0,0,0,0],[0,0,2,0],[0,0,1,1],[2,0,1,0],[0,0,0,0],[1,0,0,2],[0,0,1,0],[0,1,2,0],[2,0,0,0],[0,0,0,0],[1,0,0,1],[0,1,0,0],[1,1,1,0],[0,2,0,1],[1,2,0,0],[0,1,0,0],[0,1,1,0],[1,0,0,0],[0,1,1,1],[0,0,0,0],[1,0,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,2],[1,0,0,1],[0,1,0,2],[1,1,0,0],[0,0,0,1],[0,1,1,1],[0,1,0,0],[2,1,0,1],[0,0,0,1],[0,0,0,0],[2,1,0,0],[0,0,0,0],[0,0,0,1],[1,1,1,0],[0,1,1,1],[0,0,1,0],[0,1,0,0],[0,1,0,0],[0,0,0,1],[0,2,1,1],[1,0,0,1],[0,0,0,0],[0,0,1,0],[0,0,0,2],[1,0,0,1],[1,1,0,0],[0,0,1,0],[0,0,1,0],[2,0,0,1],[0,0,0,0],[0,1,0,1],[0,0,0,1],[0,0,1,0],[1,1,0,0],[1,1,0,0],[1,1,0,1],[0,0,2,0],[0,1,1,0],[0,0,0,0],[3,0,0,0],[1,0,1,2],[1,0,0,0],[1,0,0,1],[0,0,0,0],[0,0,0,0],[0,1,0,1],[1,1,0,0],[1,0,1,1],[1,1,0,1],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[1,0,1,0],[0,0,0,0],[2,0,0,0],[3,0,0,1],[1,1,0,0],[0,1,0,1],[0,0,0,0],[1,1,0,2],[1,1,2,0],[0,0,0,2],[0,1,0,0],[1,1,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,2,0],[0,0,0,0],[0,0,0,1],[1,0,0,0],[1,0,0,1],[0,2,0,0],[1,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,1,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,0,0,0],[2,0,0,0],[1,1,0,0],[2,2,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,0,0],[1,0,0,0]]},{"seed":7,"arrivals":[[0,2,0,1],[2,0,0,0],[0,0,0,2],[1,0,0,0],[0,0,0,1],[0,0,0,0],[0,1,0,0],[1,0,1,1],[1,0,0,1],[0,0,0,0],[0,1,1,0],[1,0,0,0],[0,0,1,0],[0,1,0,2],[0,0,0,1],[0,1,0,0],[0,0,0,1],[0,0,0,0],[0,0,0,1],[0,0,1,0],[1,0,0,1],[1,1,0,0],[1,0,1,0],[0,0,0,0],[0,1,0,0],[1,1,0,1],[0,0,1,1],[0,0,1,1],[1,1,0,0],[0,0,1,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[1,0,1,1],[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,1,0],[0,0,0,1],[1,0,0,0],[0,1,1,0],[2,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,1,0],[0,1,0,0],[1,0,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[1,0,1,0],[0,1,0,0],[1,1,0,0],[0,1,0,0],[2,0,1,0],[3,0,0,0],[1,1,0,0],[0,1,0,0],[1,2,0,0],[1,1,1,0],[1,0,0,0],[1,1,0,0],[0,0,0,0],[1,0,3,0],[0,0,0,0],[0,0,1,0],[1,0,0,0],[0,0,0,1],[0,0,0,2],[1,0,0,1],[0,0,0,0],[0,2,0,0],[1,1,0,0],[0,1,0,1],[0,0,1,1],[1,1,0,0],[1,0,0,0],[0,1,0,0],[1,0,0,0],[1,0,0,1],[0,0,0,0],[0,0,0,1],[0,1,0,1],[0,1,0,0],[0,0,0,0],[0,1,0,1],[2,1,0,1],[0,1,0,0],[0,0,0,0],[1,0,0,0],[2,0,1,0],[0,1,0,0],[0,2,0,0],[0,0,0,0],[1,0,0,1],[0,1,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,1],[0,0,0,0],[0,0,0,1],[0,0,0,1],[2,0,0,0],[1,2,0,0],[3,1,0,1],[0,0,0,0],[1,2,0,0],[0,0,0,1],[1,1,0,1],[0,1,0,0],[1,1,1,0],[0,0,1,0],[1,0,0,0],[1,1,0,0],[1,0,0,1],[0,1,0,1],[0,0,0,0],[0,0,0,0],[0,2,0,0],[0,0,1,1],[0,2,0,0],[1,0,1,0],[1,0,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[0,0,1,0],[1,0,0,0],[1,0,1,0],[0,0,1,0],[0,0,0,1],[0,0,0,0],[0,0,0,1],[0,1,1,1],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,2,0],[0,0,0,0],[1,1,0,1],[0,1,0,0],[1,1,0,0],[0,0,0,0],[1,1,1,1],[0,2,1,0],[1,0,0,0],[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,1,0],[0,1,0,2],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,2,0],[0,0,0,0],[0,1,0,1],[0,0,1,0],[1,0,0,1],[1,0,1,0],[1,1,0,0],[2,1,0,0],[0,0,0,0],[0,2,0,1],[0,0,1,0],[0,0,0,2],[0,0,1,0],[0,0,1,0],[0,0,1,0],[0,1,0,0],[0,0,0,0],[1,2,0,1],[1,1,0,1],[1,0,0,0],[0,1,0,3],[0,1,1,0],[0,0,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[0,0,0,1],[1,1,0,1],[0,0,1,0],[1,0,0,0],[0,1,0,1],[0,0,0,0],[0,1,0,0],[0,1,0,1],[0,0,1,0],[1,1,0,0],[1,1,2,1],[0,0,0,0],[0,0,0,0],[2,1,0,1],[2,1,1,0],[1,0,0,0],[0,2,0,1],[1,1,1,1],[1,0,0,0],[2,0,0,1],[0,1,0,0],[0,1,0,0],[0,1,1,0],[1,1,1,1],[0,1,1,0],[0,1,2,0],[1,0,0,0],[0,2,0,0],[0,1,0,1],[0,1,1,0],[0,1,2,0],[0,0,1,0],[3,2,0,0],[0,0,1,0],[1,2,0,0],[1,0,1,0],[1,0,0,0],[0,1,0,0],[0,1,0,0],[1,0,0,0],[2,0,0,1],[1,0,0,0],[2,1,0,0],[0,0,0,0],[0,0,1,0],[2,1,0,1],[2,2,0,0],[0,1,0,1],[1,1,0,0],[1,0,0,0],[1,0,0,0],[2,1,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[0,0,0,1],[0,1,1,0],[0,0,0,0],[2,1,0,0],[0,2,0,2],[3,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[4,0,1,0],[2,1,0,0],[0,0,0,0],[2,1,0,0],[0,1,0,1],[1,0,0,0],[0,0,1,0],[1,3,0,0],[0,0,0,1],[2,1,0,1],[0,0,0,0],[0,1,1,0],[0,3,0,0],[0,0,0,1],[2,0,0,0],[0,1,0,0],[1,1,0,0],[0,3,0,1],[1,0,0,1],[0,0,0,1],[1,0,1,0],[0,1,0,0],[1,1,0,0],[0,0,0,0],[0,0,1,0],[1,0,0,0],[0,2,0,1],[2,1,1,0],[0,0,0,1],[0,0,0,3],[1,0,0,1],[0,0,0,0],[0,0,1,0],[1,2,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,1],[0,2,1,0],[0,1,0,0],[0,0,0,0],[1,2,0,0],[0,0,0,0],[1,1,0,0],[1,2,0,0],[1,0,0,1],[0,0,0,0],[1,1,0,2],[0,0,0,0],[2,0,0,0],[1,0,1,0],[0,1,0,0],[1,1,0,0],[1,2,0,0],[1,1,0,0],[0,0,0,0],[0,0,1,0],[1,0,0,0],[3,0,0,0],[1,0,0,0],[0,1,0,0],[1,0,2,1],[0,0,0,1],[0,0,0,0],[0,2,1,0],[2,0,2,0],[2,1,1,0],[0,0,1,0],[1,0,1,1],[0,1,0,0],[0,0,0,0],[2,1,0,0],[1,2,1,0],[3,1,0,0],[0,0,0,0],[0,1,0,1],[1,0,1,1],[0,1,0,0],[0,1,0,0],[2,1,0,1],[2,0,1,1],[2,0,0,0],[0,0,0,0],[0,1,0,0],[0,1,0,1],[1,0,1,0],[2,1,0,0],[2,0,0,0],[3,0,0,0],[1,0,1,0],[0,1,1,0],[1,2,0,0],[0,2,1,0],[1,1,0,0],[1,0,1,1],[0,0,0,0],[0,0,0,0],[0,1,2,1],[1,0,1,0],[1,1,0,0],[0,1,0,0],[2,0,1,0],[0,0,1,0],[0,1,0,0],[0,1,1,1],[2,1,0,0],[1,0,0,0],[0,1,0,1],[0,0,0,0],[1,2,0,0],[0,0,1,1],[0,0,0,0],[0,1,0,0],[1,0,0,0],[1,1,0,0],[0,0,0,0],[1,0,0,0],[0,1,0,2],[2,0,0,1],[0,0,1,0],[1,0,0,0],[0,0,1,0],[0,0,1,1],[1,1,0,0],[1,0,0,0],[2,0,0,0],[1,1,0,0],[0,0,0,0],[0,1,0,0],[0,2,0,1],[3,0,0,0],[2,0,0,0],[0,1,1,0],[0,0,0,0],[2,1,2,1],[2,0,0,2],[1,0,0,0],[0,0,0,0],[1,0,0,0],[0,3,0,0],[0,0,2,0],[2,0,0,0],[0,0,0,0],[0,0,1,0],[1,1,0,0],[1,2,0,0],[2,0,1,0],[0,0,0,0],[0,0,1,0],[1,2,0,0],[1,0,0,0],[1,0,0,0],[1,1,0,0],[1,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,1],[1,1,0,0],[0,0,1,0],[0,1,0,3],[0,0,0,0],[1,0,0,0],[1,1,1,2],[0,0,0,0],[1,0,0,0],[0,2,0,0],[2,1,0,0],[0,0,0,1],[1,0,0,2],[3,1,0,0],[0,0,0,0],[1,0,0,1],[0,0,2,0],[0,2,0,0],[0,2,1,0],[0,0,0,0],[0,0,0,1],[0,1,0,0],[0,2,1,0],[0,0,0,1],[0,1,0,1],[3,0,0,0],[1,1,0,1],[0,0,1,0],[0,0,0,1],[1,0,2,1],[0,0,0,0],[0,0,0,0],[0,0,0,1],[1,0,0,2],[0,2,1,1],[0,1,0,0],[1,0,1,0],[0,0,0,1],[1,2,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,1],[2,0,1,0],[0,1,0,0],[1,1,0,1],[2,0,0,0],[0,0,0,1],[0,2,0,1],[0,0,0,0],[0,0,0,0],[0,1,0,1],[1,1,0,1],[1,0,1,0],[1,1,0,0],[0,0,1,0],[0,0,1,0],[1,0,1,1],[0,0,0,0],[0,0,0,0],[0,0,1,0],[0,1,0,0],[1,0,0,1],[0,0,1,0],[0,0,0,1],[0,3,0,0],[0,3,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[1,1,0,0],[0,0,0,0],[1,0,0,1],[0,1,1,1],[1,0,0,0],[0,1,1,0],[1,1,0,0],[0,0,0,2],[0,0,1,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[1,1,0,0],[1,1,0,1],[2,0,1,0],[1,0,0,0],[0,1,0,0],[0,0,3,0],[0,0,1,0],[0,0,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,0],[0,0,0,0],[2,0,0,0],[0,1,0,0],[0,1,3,0],[1,0,0,0],[0,0,0,0],[1,0,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,0,0,1],[0,1,0,1],[1,0,0,2],[0,0,0,1],[0,0,1,1],[0,1,0,0],[0,0,0,1],[0,3,0,0],[0,0,0,0],[0,0,1,0],[1,1,0,0],[1,0,0,0],[0,0,0,1],[0,1,1,1],[1,0,0,0],[1,0,1,1],[2,0,0,0],[0,1,1,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,1],[1,2,1,1],[0,0,0,0],[0,0,0,1],[1,0,1,1],[0,0,0,0],[0,1,0,0],[0,0,0,1],[0,1,1,0],[0,1,2,0],[1,0,0,0],[1,0,1,0],[0,0,0,1],[1,2,0,1],[0,1,0,0],[1,0,1,1],[1,1,0,1],[0,0,0,1],[0,0,1,1],[0,1,0,0],[0,0,0,0],[1,0,1,0],[0,0,0,2],[1,0,1,0],[0,1,0,0],[0,0,0,1],[0,1,1,1],[1,0,1,0],[1,0,1,0],[1,0,1,3],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,1,0],[2,1,0,0],[2,1,1,0],[0,3,1,1],[1,2,2,0],[0,0,2,0],[0,0,0,0],[0,0,2,1],[1,0,1,0],[0,0,1,1],[1,0,0,1],[0,0,0,0],[0,1,2,1],[0,2,1,0],[0,0,0,0],[0,2,0,1],[0,1,1,0],[0,0,0,1],[0,1,0,0],[0,1,0,1],[1,0,0,1],[0,0,0,0],[0,1,0,0],[0,1,1,1],[0,2,1,0],[1,0,0,0],[0,0,3,2],[0,0,1,1],[1,2,1,0],[2,0,1,0],[0,1,2,3],[0,2,0,0],[0,2,0,0],[0,0,0,0],[1,1,0,1],[3,1,1,0],[1,0,0,1],[1,0,3,0],[0,1,0,1],[1,0,1,0],[2,0,0,2],[0,0,0,1],[2,1,0,0],[0,2,0,1],[0,0,1,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[0,0,0,1],[0,0,0,0],[1,0,3,1],[0,1,1,0],[0,1,1,0],[0,1,1,2],[0,0,0,0],[1,0,0,1],[0,0,0,0],[0,0,0,1],[0,0,0,1],[0,0,0,1],[0,0,1,2],[0,1,0,0],[0,2,0,1],[2,1,0,0],[2,0,0,0],[0,0,0,0],[1,0,0,0],[0,0,1,0],[2,0,0,0],[1,0,0,1],[0,1,1,0],[1,0,0,1],[0,0,0,1],[2,0,0,1],[1,0,0,1],[0,0,1,0],[1,0,0,0],[0,0,0,0],[1,0,0,1],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,1],[0,1,1,0],[1,2,0,1],[0,1,0,0],[0,0,0,1],[0,0,0,1],[1,1,0,0],[0,0,0,0],[0,0,0,0],[0,1,1,1],[0,0,1,1],[0,0,0,0],[1,1,0,0],[0,1,0,0],[0,1,0,1],[0,1,0,0],[0,0,0,0],[2,0,0,0],[0,0,0,2],[0,1,0,1],[1,1,1,0],[0,0,0,0],[0,0,0,1],[2,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[2,0,0,1],[1,0,0,0],[0,0,0,1],[0,0,1,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[1,0,0,1],[0,0,1,0],[0,0,1,0],[1,0,1,0],[0,0,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,2,1,0],[0,1,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,1],[2,2,0,0],[0,2,0,0],[1,2,0,0],[1,0,0,0],[0,0,0,0],[2,0,0,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,0,0],[1,0,1,0],[0,1,0,1],[2,1,0,0],[0,0,0,0],[0,1,0,0],[0,1,0,0]]},{"seed":99,"arrivals":[[0,0,0,1],[0,0,0,0],[0,1,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[0,0,0,0],[0,2,0,0],[0,1,0,1],[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,2],[0,0,0,1],[0,0,0,1],[1,1,0,1],[0,0,0,1],[0,0,0,0],[1,0,0,0],[0,0,0,0],[1,2,1,0],[0,1,0,0],[1,0,0,0],[1,0,0,0],[1,2,1,0],[2,2,0,0],[1,1,0,1],[1,1,1,0],[1,1,0,0],[1,1,0,0],[1,0,0,0],[0,1,0,1],[1,0,0,0],[1,1,0,0],[1,1,0,0],[0,1,1,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[1,1,0,0],[0,0,1,0],[1,0,0,0],[0,0,0,0],[2,0,1,2],[0,1,0,0],[0,1,0,0],[1,0,0,2],[0,2,0,0],[4,1,0,1],[1,1,0,1],[1,0,0,0],[1,2,0,0],[0,0,0,0],[0,2,0,0],[0,0,1,0],[0,1,0,0],[1,1,0,0],[1,0,0,0],[2,1,0,0],[0,0,0,0],[0,0,1,1],[0,1,0,0],[1,0,0,0],[0,1,2,0],[0,1,0,1],[0,1,0,0],[1,0,0,0],[1,1,0,2],[0,1,0,0],[0,0,0,0],[1,0,0,1],[2,1,0,1],[0,1,1,0],[0,0,0,0],[0,1,0,0],[1,0,1,0],[0,0,0,0],[1,0,0,1],[0,0,0,0],[0,0,1,1],[0,1,0,2],[0,0,0,1],[0,0,0,0],[2,2,0,0],[0,0,1,1],[2,0,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,1],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,1,0],[0,1,1,0],[1,1,1,0],[1,0,0,0],[0,1,0,1],[0,0,1,1],[1,0,0,1],[0,0,0,0],[0,0,3,0],[0,1,0,0],[0,2,0,0],[1,1,1,0],[0,2,0,0],[3,0,0,0],[2,0,1,0],[1,1,0,0],[0,0,2,1],[1,1,0,0],[0,0,0,0],[0,0,0,1],[1,1,0,0],[1,0,0,0],[2,0,1,0],[1,0,1,1],[1,0,1,1],[0,0,0,0],[1,0,1,0],[0,0,0,1],[0,0,2,1],[0,0,0,0],[0,0,1,0],[2,0,0,0],[0,2,2,0],[2,2,0,1],[2,1,0,0],[0,1,0,1],[0,0,0,0],[0,0,0,1],[0,0,0,0],[1,0,0,0],[0,0,1,0],[0,2,1,0],[0,2,0,0],[1,1,0,0],[0,2,0,1],[1,0,0,0],[1,0,0,0],[1,1,0,0],[0,0,0,1],[1,0,0,0],[0,0,0,0],[2,1,0,0],[0,0,1,0],[1,0,0,1],[0,1,0,0],[1,1,0,1],[1,0,1,0],[0,0,1,0],[0,1,1,0],[1,1,0,0],[0,1,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,1,0],[0,0,0,0],[2,1,0,1],[0,0,0,0],[0,0,0,0],[1,1,0,2],[1,0,0,0],[0,1,0,1],[0,0,0,0],[1,0,0,0],[2,0,0,0],[2,0,0,0],[0,0,0,0],[1,0,0,1],[1,1,1,1],[0,0,0,0],[1,3,1,0],[2,1,0,1],[0,0,0,0],[0,0,0,0],[3,1,0,0],[0,0,0,0],[1,2,1,1],[1,0,0,0],[0,0,1,0],[1,0,0,0],[1,0,1,0],[0,0,0,0],[1,0,0,2],[1,0,1,0],[0,1,0,0],[0,1,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[2,0,0,0],[0,1,0,0],[0,2,0,0],[0,0,0,0],[2,0,0,0],[0,1,1,0],[0,1,1,0],[0,1,0,1],[2,1,1,0],[0,0,0,1],[1,0,0,0],[0,0,0,0],[1,2,0,0],[0,2,0,0],[0,2,0,0],[0,0,0,0],[3,0,1,0],[1,1,0,0],[2,1,0,1],[1,0,0,1],[1,1,0,0],[1,1,0,1],[0,0,0,1],[0,1,0,0],[0,0,0,0],[1,0,1,1],[2,1,2,0],[2,0,1,2],[0,0,0,0],[2,2,0,0],[0,1,1,0],[0,0,0,0],[0,2,0,0],[1,2,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,2,0,1],[0,0,1,1],[0,1,0,1],[0,0,0,2],[0,2,0,0],[0,1,2,0],[0,0,1,0],[1,0,1,0],[0,1,1,0],[0,1,0,1],[1,0,1,0],[2,1,0,0],[2,1,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,1],[1,1,0,0],[2,0,0,0],[2,1,0,0],[0,0,1,0],[1,0,0,1],[1,0,0,0],[1,1,0,0],[3,1,0,0],[1,2,0,1],[2,1,0,0],[1,0,0,0],[2,1,1,1],[3,0,0,0],[2,0,0,0],[0,1,0,1],[1,1,0,1],[0,0,0,0],[1,0,0,1],[0,1,0,0],[4,0,0,0],[2,1,0,1],[2,2,0,0],[1,1,0,0],[2,0,0,0],[0,1,0,1],[0,0,0,0],[1,3,0,0],[0,1,0,0],[0,0,0,0],[1,4,1,0],[0,0,0,0],[4,1,0,0],[1,0,0,0],[2,1,0,0],[0,1,0,1],[2,1,1,0],[0,0,1,1],[1,0,1,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[1,0,0,0],[1,1,0,0],[1,2,0,0],[0,0,0,0],[2,0,0,0],[2,0,0,1],[0,0,2,0],[0,0,1,0],[1,2,1,0],[2,1,0,0],[1,0,0,0],[1,0,1,0],[1,0,1,0],[0,0,0,0],[2,0,1,0],[0,0,1,0],[0,0,0,0],[1,2,0,0],[1,0,0,0],[0,2,1,0],[1,1,0,1],[2,2,0,0],[1,0,0,0],[0,0,3,0],[1,0,0,1],[1,1,1,1],[1,2,1,1],[0,0,0,0],[1,1,0,0],[0,0,0,0],[0,2,0,0],[1,3,0,0],[2,0,1,0],[2,1,1,2],[2,0,0,0],[1,1,0,0],[0,3,0,0],[0,1,0,2],[0,0,1,0],[1,0,0,0],[0,0,0,0],[2,0,0,0],[0,2,0,0],[0,2,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[1,0,0,0],[0,1,0,0],[1,0,0,0],[3,1,0,0],[0,1,0,0],[0,1,0,0],[0,0,0,0],[1,0,0,0],[0,1,0,0],[0,0,0,0],[1,1,0,0],[0,0,0,0],[4,0,0,0],[0,1,0,0],[1,1,0,1],[0,0,0,0],[1,0,0,1],[0,1,1,0],[0,0,1,1],[0,0,0,0],[0,0,1,0],[1,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,1,0],[0,1,1,0],[1,0,0,0],[2,0,0,0],[1,2,0,0],[0,1,0,1],[2,0,0,0],[1,2,0,0],[0,1,0,0],[0,0,0,2],[0,0,0,0],[3,2,0,0],[0,2,0,0],[1,0,0,1],[2,1,0,0],[0,0,0,1],[2,1,0,0],[0,0,0,0],[1,0,0,0],[1,1,0,0],[0,1,0,1],[0,0,1,2],[1,0,0,1],[0,0,0,0],[1,0,1,0],[0,3,0,0],[0,1,0,1],[1,0,0,0],[1,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,1,0],[2,1,0,0],[0,0,0,0],[1,0,1,0],[0,1,1,1],[0,0,0,0],[0,0,0,0],[2,1,1,1],[0,0,0,0],[0,0,0,0],[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,1,0],[0,1,0,0],[0,1,0,1],[0,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,2,0,0],[1,0,1,0],[0,1,0,0],[0,1,0,2],[0,3,0,1],[2,0,1,0],[0,0,0,0],[0,0,0,1],[0,1,0,0],[1,1,0,0],[1,1,0,1],[1,0,0,1],[1,1,2,0],[0,1,0,0],[1,0,0,0],[0,0,0,1],[2,1,0,1],[0,1,0,0],[0,0,1,0],[0,0,0,0],[1,1,0,0],[2,0,2,0],[2,0,1,0],[0,1,0,0],[2,1,1,0],[0,0,1,0],[0,0,1,0],[0,1,1,0],[0,1,1,0],[1,0,3,1],[0,0,0,1],[0,0,1,1],[0,0,0,0],[0,0,0,2],[0,0,2,0],[0,0,0,1],[0,0,1,0],[1,0,0,0],[1,0,0,0],[0,0,0,0],[0,1,1,0],[0,0,1,1],[0,0,1,0],[1,0,0,0],[1,0,0,1],[0,0,1,0],[0,1,0,1],[1,1,3,0],[1,0,0,1],[0,0,0,0],[1,0,0,0],[1,0,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0],[0,1,0,1],[0,0,0,0],[0,0,1,0],[0,0,1,0],[1,0,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,0],[0,0,0,0],[0,1,1,1],[0,0,0,0],[1,0,0,3],[1,2,0,0],[0,0,0,0],[0,0,0,0],[0,2,0,1],[0,3,0,1],[0,2,0,0],[0,2,1,0],[0,0,0,0],[0,1,0,0],[1,0,2,0],[0,0,0,1],[0,0,0,0],[1,0,0,0],[0,1,2,0],[1,0,0,1],[0,1,0,0],[0,0,0,0],[0,0,0,1],[0,0,0,1],[0,1,0,0],[0,0,0,2],[0,0,0,0],[0,0,0,1],[0,0,0,1],[1,1,0,0],[0,0,0,1],[0,0,1,0],[0,0,0,1],[0,0,0,0],[2,1,1,0],[0,0,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,1],[0,0,0,0],[0,1,1,0],[0,0,0,1],[0,1,0,0],[1,0,0,0],[0,1,0,0],[0,2,0,0],[1,0,1,2],[0,0,1,0],[1,0,0,4],[0,0,0,0],[1,0,0,0],[1,1,1,0],[0,1,0,1],[1,1,0,1],[0,2,0,0],[0,0,0,2],[0,2,0,0],[1,0,1,0],[1,0,0,1],[0,1,1,0],[0,0,1,0],[0,0,2,0],[0,0,0,0],[0,1,1,1],[0,1,0,0],[1,0,0,0],[0,1,0,0],[0,1,2,1],[0,1,0,0],[0,1,1,1],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,0],[0,0,2,0],[0,0,1,0],[0,0,1,1],[1,1,0,0],[0,0,0,0],[0,0,1,1],[0,2,0,0],[1,1,0,0],[0,1,0,0],[1,1,2,0],[0,1,1,0],[0,1,0,1],[1,1,0,0],[1,0,1,1],[0,1,0,0],[1,0,0,1],[0,1,0,0],[1,0,0,0],[0,0,1,0],[1,0,1,0],[2,0,0,1],[0,0,1,0],[0,0,1,1],[0,0,0,0],[0,0,0,0],[1,0,1,0],[0,1,1,0],[1,0,0,1],[0,1,0,0],[0,0,0,1],[0,2,0,0],[1,0,0,0],[1,1,0,0],[1,0,1,0],[0,3,0,1],[1,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,1,0],[0,0,1,0],[0,0,0,0],[1,0,1,1],[0,0,1,1],[0,1,0,1],[0,0,0,1],[0,1,0,1],[1,0,3,0],[0,0,1,0],[0,2,0,0],[0,0,1,0],[1,0,1,0],[0,2,0,0],[0,0,0,2],[0,0,1,0],[0,0,0,1],[2,1,2,0],[0,2,0,2],[0,0,0,1],[1,0,1,0],[1,0,0,0],[0,0,0,1],[0,0,0,0],[1,0,0,1],[0,1,0,0],[0,1,1,0],[2,0,0,1],[2,1,0,0],[2,0,0,0],[0,1,1,1],[0,0,0,0],[1,0,1,1],[0,0,1,0],[0,1,0,2],[0,1,0,1],[0,1,0,1],[1,0,0,0],[0,0,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,1,0,1],[0,0,1,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,2,2,1],[1,0,1,0],[0,0,0,0],[0,1,0,0],[0,0,0,0],[2,0,2,0],[0,3,1,0],[0,0,1,1],[0,2,1,0],[1,1,0,1],[0,2,0,0],[2,1,0,0],[2,2,2,0],[1,0,0,0],[2,0,0,0],[0,0,1,0],[2,0,0,0],[0,0,0,0],[1,0,1,0],[0,1,0,0],[0,0,1,0],[1,0,0,0],[0,0,2,0],[0,0,2,0],[0,2,0,0],[1,0,0,2],[0,1,0,0],[0,2,0,0],[0,1,0,1],[0,1,0,0],[1,1,1,0],[0,0,1,0],[0,1,0,0],[0,0,1,0],[0,0,0,0],[1,0,0,0],[1,0,0,0],[0,0,0,1],[0,0,1,2],[0,0,0,1],[1,1,0,0],[0,1,0,0],[2,0,0,1],[1,0,0,0],[0,0,1,0],[0,2,1,0],[1,0,0,1],[1,1,1,0],[0,0,1,0],[0,1,0,0],[0,0,1,1],[1,0,0,0],[0,1,0,0],[0,0,0,0],[0,1,0,0],[0,0,1,0],[0,1,0,0],[0,1,1,0],[2,0,0,0],[1,0,0,0],[0,0,0,0],[3,0,1,0],[1,1,0,0],[0,0,0,0],[1,1,1,0],[1,0,0,1],[0,0,0,0],[1,1,0,0],[0,0,0,0],[1,1,0,0],[1,0,0,0],[0,0,0,0],[1,1,0,0],[0,0,1,1],[2,0,1,2],[1,0,0,0],[2,0,0,0],[0,1,0,0],[1,0,0,0],[0,0,0,0]]}]};
+const $ = (id) => document.getElementById(id);
+const NAMES = { fixed: 'Fixed-Time', lq: 'Longest-Queue', random: 'Random', q: 'Q-Learning' };
+const LEN = Sim.LEN, STOP = 48, GAP = 13, SIZE = 400;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt = (x, d = 1) => x.toFixed(d);
+
+let arrivals, frames = {}, smooth = {}, idx = 0, playing = !reduced, stepMs = 700, accum = 0, last = 0, dirty = true, other = 'fixed', hoverI = null, yMax = 10, randCount = 0;
+
+/* ---------- junction panels ---------- */
+function buildPanel(el, i) {
+  el.innerHTML = `<div class="jhead"><h3><span class="key" id="key${i}"></span><span id="name${i}"></span></h3>
+    <span class="pill"><span class="lamp" id="lamp${i}"></span><span id="light${i}"></span></span></div>
+    <canvas id="cv${i}" width="800" height="800" role="img" aria-label="Animated intersection with queued cars"></canvas>
+    <dl class="stats">
+      <div><dt>Average wait so far</dt><dd id="w${i}"></dd></div>
+      <div><dt>Cars waiting now</dt><dd id="n${i}"></dd></div>
+      <div><dt>Cars served</dt><dd id="s${i}"></dd></div>
+      <div><dt>Signal changes</dt><dd id="c${i}"></dd></div>
+    </dl>`;
+}
+buildPanel($('J0'), 0); buildPanel($('J1'), 1);
+$('key0').style.background = 'var(--base)'; $('key1').style.background = 'var(--q)';
+$('legend').innerHTML = '<span><span class="key" style="background:var(--base)"></span><span id="leg0"></span></span><span><span class="key" style="background:var(--q)"></span>Q-Learning agent</span>';
+
+/* ---------- animated cars ---------- */
+const views = [{ cars: [[], [], [], []], leaving: [] }, { cars: [[], [], [], []], leaving: [] }];
+const target = (i) => STOP + 8 + i * GAP;
+function rebuild() {
+  [other, 'q'].forEach((k, v) => {
+    const f = frames[k][idx];
+    views[v].cars = f.q.map((n) => Array.from({ length: n }, (_, i) => ({ d: target(i) })));
+    views[v].leaving = [];
+  });
+}
+function applyStep(v, f) {
+  const view = views[v];
+  for (let l = 0; l < 4; l++) {
+    const list = view.cars[l];
+    for (let a = 0; a < f.arr[l]; a++) list.push({ d: Math.max(SIZE / 2 + 12, target(list.length)) });
+    for (let o = 0; o < f.out[l]; o++) {
+      const c = list.shift();
+      if (c && stepMs > 30) view.leaving.push({ d: c.d, l });
+    }
+    list.length = Math.min(list.length, f.q[l]);
+  }
+}
+function place(l, d) {
+  if (l === 0) return [SIZE / 2 + 11, SIZE / 2 - d, true];
+  if (l === 1) return [SIZE / 2 - 11, SIZE / 2 + d, true];
+  if (l === 2) return [SIZE / 2 + d, SIZE / 2 + 11, false];
+  return [SIZE / 2 - d, SIZE / 2 - 11, false];
+}
+function drawCar(g, l, d) {
+  const [x, y, vert] = place(l, d), w = vert ? 9 : 11, h = vert ? 11 : 9;
+  g.fillRect(x - w / 2, y - h / 2, w, h);
+  g.strokeRect(x - w / 2, y - h / 2, w, h);
+}
+function draw(v, dt, f) {
+  const cv = $('cv' + v), g = cv.getContext('2d'), s = cv.width / SIZE, c = SIZE / 2, view = views[v];
+  g.setTransform(s, 0, 0, s, 0, 0);
+  const col = { block: css('--block'), road: css('--road'), mark: css('--mark'), car: css('--car'), edge: css('--car-edge'), go: css('--go'), wait: css('--wait'), stop: css('--stop'), fg: css('--fg') };
+  g.fillStyle = col.block; g.fillRect(0, 0, SIZE, SIZE);
+  g.fillStyle = col.road; g.fillRect(c - 24, 0, 48, SIZE); g.fillRect(0, c - 24, SIZE, 48);
+  // centre lines and stop lines
+  g.strokeStyle = col.mark; g.lineWidth = 1.5; g.setLineDash([8, 8]);
+  [[c, 0, c, c - 30], [c, c + 30, c, SIZE], [0, c, c - 30, c], [c + 30, c, SIZE, c]].forEach(([a, b, e, h]) => { g.beginPath(); g.moveTo(a, b); g.lineTo(e, h); g.stroke(); });
+  g.setLineDash([]);
+  // signal state per approach, shown as a coloured stop line and lamp
+  const ns = f.phase === 0, colorFor = (l) => f.yellow ? col.wait : ((l < 2) === ns ? col.go : col.stop);
+  g.lineWidth = 4;
+  const stops = [[c, c - STOP, c + 24, c - STOP], [c - 24, c + STOP, c, c + STOP], [c + STOP, c, c + STOP, c + 24], [c - STOP, c - 24, c - STOP, c]];
+  stops.forEach((p, l) => { g.strokeStyle = colorFor(l); g.beginPath(); g.moveTo(p[0], p[1]); g.lineTo(p[2], p[3]); g.stroke(); });
+  const lamps = [[c + 38, c - STOP - 8], [c - 38, c + STOP + 8], [c + STOP + 8, c + 38], [c - STOP - 8, c - 38]];
+  lamps.forEach((p, l) => { g.fillStyle = col.edge; g.beginPath(); g.arc(p[0], p[1], 9, 0, 7); g.fill(); g.fillStyle = colorFor(l); g.beginPath(); g.arc(p[0], p[1], 6.5, 0, 7); g.fill(); });
+  // cars
+  const k = reduced ? 1 : 1 - Math.exp(-dt / Math.max(30, Math.min(stepMs / 3, 150)));
+  g.fillStyle = col.car; g.strokeStyle = col.edge; g.lineWidth = 1;
+  view.cars.forEach((list, l) => list.forEach((car, i) => {
+    car.d += (target(i) - car.d) * k;
+    if (car.d < c + 10) drawCar(g, l, car.d);
+  }));
+  view.leaving = view.leaving.filter((car) => {
+    car.d -= 0.32 * dt; drawCar(g, car.l, car.d); return car.d > -c - 10;
+  });
+  // approach counts in the corners next to each road
+  g.font = '600 15px "Barlow Semi Condensed", Arial, sans-serif'; g.fillStyle = col.fg; g.textBaseline = 'middle';
+  const lab = [['North', f.q[0], c + 34, 20, 'left'], ['South', f.q[1], c - 34, SIZE - 20, 'right'], ['East', f.q[2], SIZE - 12, c + 42, 'right'], ['West', f.q[3], 12, c - 42, 'left']];
+  lab.forEach(([n, q, x, y, a]) => { g.textAlign = a; g.fillText(`${n}: ${q}`, x, y); });
+}
+
+/* ---------- simulation set-up ---------- */
+function computeSmooth(key) {
+  const f = frames[key], out = [];
+  let sum = 0; const tot = (x) => x.q[0] + x.q[1] + x.q[2] + x.q[3];
+  for (let i = 0; i < f.length; i++) { sum += tot(f[i]); if (i >= 15) sum -= tot(f[i - 15]); out.push(sum / Math.min(i + 1, 15)); }
+  return out;
+}
+function loadRun() {
+  for (const k of [other, 'q']) { frames[k] = Sim.run(k, arrivals, DATA.Q); smooth[k] = computeSmooth(k); }
+  yMax = Math.max(4, Math.ceil(Math.max(...smooth[other], ...smooth.q) / 5) * 5);
+  $('name0').textContent = NAMES[other] + ' signal';
+  $('name1').textContent = 'Q-Learning agent';
+  $('leg0').textContent = NAMES[other] + ' signal';
+  rebuild(); dirty = true;
+}
+function setTraffic(val) {
+  if (val === 'random') { randCount++; arrivals = Sim.makeArrivals((Date.now() ^ (randCount * 7919)) | 0); }
+  else arrivals = DATA.refs[+val].arrivals;
+}
+
+/* ---------- UI updates ---------- */
+function lightText(f) {
+  if (f.yellow) return ['Yellow: everyone stops', 'var(--wait)'];
+  return [(f.phase === 0 ? 'North–South' : 'East–West') + ' green', 'var(--go)'];
+}
+function rushText(t) {
+  const fr = t / LEN;
+  if (fr > 0.28 && fr < 0.52) return 'North–South rush: more cars on the North and South roads';
+  if (fr > 0.71 && fr < 0.89) return 'East–West rush: more cars on the East and West roads';
+  return 'Normal traffic between rushes';
+}
+function render() {
+  [other, 'q'].forEach((k, v) => {
+    const f = frames[k][idx], m = Sim.metrics(f), [t, c] = lightText(f);
+    $('light' + v).textContent = t; $('lamp' + v).style.background = c;
+    $('w' + v).textContent = f.t ? fmt(m.avg_wait_s) + ' s' : '–';
+    $('n' + v).textContent = f.q[0] + f.q[1] + f.q[2] + f.q[3];
+    $('s' + v).textContent = f.served; $('c' + v).textContent = f.switches;
+  });
+  const secs = idx * 5;
+  $('clock').textContent = `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')} of 60:00`;
+  $('scrub').value = idx; $('rush').textContent = rushText(idx);
+  const a = Sim.metrics(frames[other][LEN]).avg_wait_s, b = Sim.metrics(frames.q[LEN]).avg_wait_s, d = 100 * (a - b) / a;
+  const pre = idx >= LEN ? 'Result for this hour' : 'Where this hour ends up';
+  $('verdict').textContent = d >= 0
+    ? `${pre}: ${NAMES[other]} ${fmt(a)} s, Q-Learning ${fmt(b)} s. Cars wait ${fmt(d)}% less with the agent.`
+    : `${pre}: ${NAMES[other]} ${fmt(a)} s, Q-Learning ${fmt(b)} s. The agent did ${fmt(-d)}% worse on this hour.`;
+  renderBrain(); renderChart();
+  $('play').textContent = playing ? 'Pause' : (idx >= LEN ? 'Play again' : 'Play');
+}
+function renderBrain() {
+  const i = Math.max(idx, 1), f = frames.q[i], p = frames.q[i - 1], v = DATA.Q[f.state];
+  const ns = p.q[0] + p.q[1], ew = p.q[2] + p.q[3], held = p.tip * 5;
+  const plural = (n) => `${n} car${n === 1 ? '' : 's'}`;
+  $('sees').textContent = `North–South has ${plural(ns)} waiting and East–West has ${plural(ew)}. ${p.phase === 0 ? 'North–South' : 'East–West'} has had green for ${held} s.`;
+  $('vKeep').textContent = fmt(v[0], 2).replace('-', '−'); $('vSwitch').textContent = fmt(v[1], 2).replace('-', '−');
+  $('sKeep').classList.toggle('on', f.action === 0); $('sSwitch').classList.toggle('on', f.action === 1);
+  $('blocked').textContent = f.action === 1 && !f.switched ? 'It wants to switch, but the 10 s minimum green rule makes it wait.' : '';
+}
+const PAD = { l: 34, r: 12, t: 8, b: 26 };
+function renderChart() {
+  const svg = $('qsvg'), W = svg.clientWidth || 800, H = 240;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  const x = (i) => PAD.l + (i / LEN) * (W - PAD.l - PAD.r), y = (q) => H - PAD.b - (q / yMax) * (H - PAD.t - PAD.b);
+  const yStep = yMax <= 10 ? 2 : 5;
+  let o = '';
+  for (let q = 0; q <= yMax; q += yStep) o += `<line x1="${PAD.l}" x2="${W - PAD.r}" y1="${y(q)}" y2="${y(q)}" stroke="var(--line)" stroke-width="1"/><text x="${PAD.l - 7}" y="${y(q) + 4}" text-anchor="end">${q}</text>`;
+  for (const m of [0, 15, 30, 45, 60]) o += `<text x="${x(m * 12)}" y="${H - 7}" text-anchor="${m === 0 ? 'start' : m === 60 ? 'end' : 'middle'}">${m} min</text>`;
+  const path = (k) => { let s = ''; const step = W < 500 ? 3 : 1; for (let i = 0; i <= idx; i += step) s += (s ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(smooth[k][i]).toFixed(1); return s; };
+  o += `<path d="${path(other)}" fill="none" stroke="var(--base)" stroke-width="2" stroke-linejoin="round"/>`;
+  o += `<path d="${path('q')}" fill="none" stroke="var(--q)" stroke-width="2" stroke-linejoin="round"/>`;
+  o += `<line x1="${x(idx)}" x2="${x(idx)}" y1="${PAD.t}" y2="${H - PAD.b}" stroke="var(--muted)" stroke-width="1"/>`;
+  if (hoverI !== null) {
+    const i = Math.min(hoverI, idx);
+    for (const [k, c] of [[other, 'var(--base)'], ['q', 'var(--q)']]) o += `<circle cx="${x(i)}" cy="${y(smooth[k][i])}" r="4" fill="${c}" stroke="var(--panel)" stroke-width="2"/>`;
+  }
+  svg.innerHTML = o;
+  const tip = $('qtip');
+  if (hoverI === null) tip.hidden = true;
+  else {
+    const i = Math.min(hoverI, idx), secs = i * 5;
+    tip.hidden = false;
+    tip.innerHTML = `${Math.floor(secs / 60)} min ${secs % 60} s<br>${NAMES[other]}: ${fmt(smooth[other][i])} cars<br>Q-Learning: ${fmt(smooth.q[i])} cars`;
+    tip.style.left = Math.min(Math.max(x(i) + 10, 0), W - tip.offsetWidth) + 'px';
+    tip.style.top = '6px';
+  }
+}
+function chartHover(e) {
+  const r = $('qsvg').getBoundingClientRect(), W = r.width;
+  const i = Math.round(((e.clientX - r.left - PAD.l) / (W - PAD.l - PAD.r)) * LEN);
+  hoverI = Math.max(0, Math.min(LEN, i)); dirty = true;
+}
+$('qsvg').addEventListener('pointermove', chartHover);
+$('qsvg').addEventListener('pointerdown', chartHover);
+$('qsvg').addEventListener('pointerleave', () => { hoverI = null; dirty = true; });
+
+/* ---------- main loop ---------- */
+function loop(now) {
+  const dt = Math.min(now - last, 100); last = now;
+  if (playing && idx < LEN) {
+    accum += dt;
+    while (accum >= stepMs && idx < LEN) {
+      accum -= stepMs; idx++;
+      applyStep(0, frames[other][idx]); applyStep(1, frames.q[idx]); dirty = true;
+    }
+    if (idx >= LEN) { playing = false; dirty = true; }
+  }
+  draw(0, dt, frames[other][idx]); draw(1, dt, frames.q[idx]);
+  if (dirty) { render(); dirty = false; }
+  requestAnimationFrame(loop);
+}
+
+/* ---------- controls ---------- */
+$('play').onclick = () => { if (idx >= LEN) { idx = 0; rebuild(); } playing = !playing; accum = 0; dirty = true; };
+$('restart').onclick = () => { idx = 0; rebuild(); playing = true; accum = 0; dirty = true; };
+$('scrub').oninput = (e) => { idx = +e.target.value; rebuild(); dirty = true; };
+document.querySelectorAll('[data-speed]').forEach((b) => {
+  b.setAttribute('aria-pressed', +b.dataset.speed === stepMs);
+  b.onclick = () => { stepMs = +b.dataset.speed; accum = 0; document.querySelectorAll('[data-speed]').forEach((x) => x.setAttribute('aria-pressed', x === b)); };
+});
+$('other').onchange = (e) => { other = e.target.value; loadRun(); };
+$('traffic').innerHTML = DATA.refs.map((r, i) => `<option value="${i}">Test hour ${'ABC'[i]}${i === 0 ? ' (the demo.py hour)' : ''}</option>`).join('') + '<option value="random">Random hour</option>';
+$('traffic').onchange = (e) => { setTraffic(e.target.value); idx = 0; playing = !reduced; accum = 0; loadRun(); };
+$('newtraffic').onclick = () => { $('traffic').value = 'random'; setTraffic('random'); idx = 0; playing = !reduced; accum = 0; loadRun(); };
+addEventListener('resize', () => { dirty = true; });
+
+/* ---------- results section ---------- */
+const ORDER = ['Random', 'Fixed-Time', 'Longest-Queue', 'SARSA', 'Q-Learning'];
+function renderResults(scn) {
+  const R = DATA.results[scn], maxV = Math.max(...ORDER.map((n) => R[n].avg_wait_s));
+  $('rbars').innerHTML = ORDER.map((n) => `<div class="rb${n === 'Q-Learning' ? ' best' : ''}"><span class="name">${n}</span><span class="track"><span class="fill" style="width:calc((100% - 58px) * ${(R[n].avg_wait_s / maxV).toFixed(4)})"></span><span class="v">${fmt(R[n].avg_wait_s)} s</span></span></div>`).join('');
+  const q = R['Q-Learning'].avg_wait_s, pct = (n) => fmt(100 * (R[n].avg_wait_s - q) / R[n].avg_wait_s, 0);
+  $('resNote').textContent = `Q-Learning cuts waiting by ${pct('Fixed-Time')}% against Fixed-Time and ${pct('Longest-Queue')}% against Longest-Queue.` + (scn === 'uniform' ? ` SARSA is slightly ahead here, at ${fmt(R.SARSA.avg_wait_s)} s.` : '');
+  $('rtable').innerHTML = ORDER.map((n) => { const r = R[n]; return `<tr class="${n === 'Q-Learning' ? 'hl' : ''}"><td>${n}</td><td>${fmt(r.avg_wait_s)}</td><td>${fmt(r.avg_wait_s_sd)}</td><td>${fmt(r.avg_queue)}</td><td>${Math.round(r.throughput)}</td><td>${Math.round(r.switches)}</td></tr>`; }).join('');
+}
+document.querySelectorAll('[data-scn]').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('[data-scn]').forEach((x) => x.setAttribute('aria-pressed', x === b));
+  renderResults(b.dataset.scn);
+});
+renderResults('peak');
+
+/* Opens mid-hour, at the same window demo.py prints, so there is traffic to see straight away. */
+setTraffic('0'); idx = 280; loadRun();
+requestAnimationFrame((t) => { last = t; loop(t); });
+</script>
+
+</html>
